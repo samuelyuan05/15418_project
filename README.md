@@ -1,7 +1,7 @@
 # 3D FLIP Fluid Simulation with CPU/GPU Parallelization
 
 ## Authors
-Samuel Yuan, [Partner Name]
+Samuel Yuan, Daniel Stankiewicz
 
 ---
 
