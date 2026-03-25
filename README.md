@@ -5,90 +5,70 @@ Samuel Yuan, Daniel Stankiewicz
 
 ---
 
-## Overview
-
-This project implements a three-dimensional FLIP (Fluid-Implicit Particle) fluid simulator and explores parallelization strategies across CPU and GPU architectures. The system combines particle-based and grid-based computation, making it an ideal workload for studying performance tradeoffs between OpenMP and CUDA.
-
-Our primary goal is to design efficient parallel implementations of the most computationally intensive stages of the FLIP pipeline and evaluate how hardware characteristics such as memory bandwidth, synchronization overhead, and execution divergence impact performance.
-
----
-
 ## Summary
 
-We implement a 3D FLIP fluid solver in C++ and optimize it using OpenMP for CPU parallelism and CUDA for GPU acceleration. The project focuses on parallelizing particle-grid transfers and the pressure solver, while analyzing performance bottlenecks and architectural tradeoffs between CPUs and GPUs.
+We plan to implement a 3D FLIP fluid solver, and explore optimizations using CUDA and OpenMP to improve runtime performance. Throughout the process, we will analyze performance tradeoffs between running on different hardware (CPU/GPU) because of bottlenecks such as communication amongst other things.
 
 ---
 
 ## Background
+FLIP (Fluid-Implicit Particle) simulation is a hybrid simulation technique that combines both Lagrangian particles and a grid. While particles carry fluid information like mass or velocity, a background grid is used to more efficiently compute forces and enforce incompressibility. Compared to something like SPH which is reliant on particle interactions, FLIP avoids this scaled complexity by leveraging structured grid computations, while also reducing numerical dissipation by preserving particle velocities. For a FLIP simulation, during each timestep, the algorithm breaks down into a few highly parallel parts:
 
-FLIP (Fluid-Implicit Particle) is a hybrid fluid simulation technique that combines Lagrangian particles with an Eulerian grid. Particles store physical quantities such as velocity and mass, while a background grid is used to efficiently compute forces and enforce incompressibility.
+1. Particle to grid conversion: Each particle transfers its velocity and mass to nearby grid cells using interpolation. 
+2. Grid update and application: With velocities in the grid, we apply external forces (such as gravity) and compute quantities such as divergence. Because we are now working on a regular grid, we have quite strong spatial locality.
+3. Pressure solver: To enforce incompressability, we need to solve a poisson equation over the grid. This is typically one of the most expensive parts of the simulation and would require us to use some sort of iterative solver.
+4. Velocity projection: The grid velocities are then updated by subtracting the pressure gradient in order to ensure our velocity field is free of divergence
+5. Grid to particle: Finally, we transfer our new velocities to our particles.
 
-Compared to purely particle-based methods like SPH, FLIP reduces computational complexity by leveraging structured grid operations. It also minimizes numerical dissipation by preserving particle velocities during simulation updates.
+Our main data structures here include particles (with position, velocity, and mass), a 3d grid storing velocities and pressure, and other buffers for interpolation of weights and divergence. The most computationally expensive parts are the particle grid transfers and the pressure solver, which both are good candidates for parallelization. 
 
-Each timestep of the simulation consists of the following stages:
-
-1. Particle-to-grid transfer, where particle data is interpolated onto nearby grid cells.
-2. Grid update, where forces such as gravity are applied and intermediate quantities are computed.
-3. Pressure solve, where a Poisson equation is solved to enforce incompressibility.
-4. Velocity projection, which removes divergence from the velocity field.
-5. Grid-to-particle transfer, where updated velocities are mapped back to particles.
-
-The most computationally expensive components are the particle-grid transfers and the pressure solver, both of which present opportunities for parallelization.
 
 ---
 
 ## The Challenge
 
-The FLIP simulation presents a hybrid workload that combines highly parallel particle operations with structured grid computations that involve dependencies and synchronization.
+Workload:
 
-Particle operations are well-suited for parallel execution, but they require irregular memory access patterns due to scattered particle positions. In contrast, grid-based computations benefit from strong spatial locality but introduce dependencies, especially during iterative solvers such as the pressure solve.
+The workload here consists of both particle based and grid-based computations. While particle operations are quite parallelizable, the grid computations have structured dependencies, and require synchronization between iterations. Along with this, memory access patterns may be mixed. Particle simulations have scattered irregular memory accesses, while grid operations have very strong spatial locality comparatively. On GPUs we may run into divergence issues due to irregular particle distributions
 
-One of the key challenges is the particle-to-grid transfer stage, which requires multiple particles to update shared grid cells. This creates potential race conditions and necessitates the use of atomic operations or reduction strategies, particularly on the GPU.
+Constraints:
 
-The pressure solver is another major challenge because it requires iterative computation over the entire grid. Each iteration depends on the results of the previous one, introducing synchronization overhead that limits scalability.
+Mapping this workload to hardware presents a unique challenge due to the combination of irregular particle accesses and structured grid computation. The pressure solver is likely to be the hardest to solve, requiring iterative algorithms which introduce a lot of synchronization and limit scaling. On the other hand, particle to grid transfers may require atomics, or other data access patterns to prevent data races.
 
-On GPU architectures, additional challenges arise from thread divergence caused by non-uniform particle distributions and load imbalance across threads. On CPUs, the main limitation is lower throughput compared to GPUs, although CPUs may handle irregular memory access patterns more efficiently.
-
-This project aims to explore how these competing factors influence performance and determine when each hardware platform is most effective.
 
 ---
 
 ## Resources
 
-The implementation is written in C++.
+Our goal is to implement the solver in C++. We plan on using OpenMP for CPU based implementations and experimentation, and CUDA for GPU implementations (We also hope to experiment with OpenGL compute shaders if we have time!). For visualization, we will use OpenGL with GLFW, and for basic vector and matrix operations, we will likely use GLM but we will consider writing our own if we find GLM slow.
 
-We use OpenMP to parallelize CPU execution and CUDA to implement GPU kernels. For visualization, we use OpenGL with GLFW, and GLM for vector and matrix operations.
+For our implementation, we plan on referencing the SIGGRAPH 2007 Fluid Simulation Course notes, as well as the original paper, FLIP: A Low-Dissipation, Particle-in-Cell Method for Fluid Flow. We also plan on referencing other people’s implementation details which are available online.
 
-We reference the following materials:
-- *FLIP: A Low-Dissipation, Particle-in-Cell Method for Fluid Flow*
-- SIGGRAPH 2007 Fluid Simulation Course Notes
-- Public implementations and technical blogs on FLIP simulation
-
-We begin implementation from scratch to fully control data structures and parallelization strategies.
 
 ---
 
 ## Goals and Deliverables
 
-The primary goal of this project is to build a working 3D FLIP simulator and evaluate parallel performance across CPU and GPU implementations.
+**Plan to achieve:**
+  - Working 3D FLIP based fluid simulator
+  - A parallel CPU implementation using OpenMP
+  - A GPU implementation using CUDA
+  - A combined implementation
+  - Evaluation comparing CPU and GPU workloads
+  - Analysis of bottlenecks
+  - 
+**Hope to achieve:**
+  - Real time simulation for moderately sized grids
+  - Optimized pressure solver
+  - Improved parallel memory locality via layout optimizations
+  - A demo of fluid behavior
 
-We plan to deliver a complete simulation pipeline with both OpenMP and CUDA implementations. We will benchmark performance across different stages of the algorithm and analyze bottlenecks such as synchronization, memory access patterns, and communication overhead.
-
-We aim to achieve at least a 5× speedup on the GPU compared to a single-threaded CPU baseline. Our target simulation size is a grid of at least 64³ cells with approximately 100,000 particles.
-
-In addition to core functionality, we hope to achieve near real-time simulation performance for moderate grid sizes and explore optimizations such as improved memory layouts and more efficient pressure solvers.
-
-If time permits, we will include a real-time visualization of the simulation and a side-by-side comparison of CPU and GPU performance.
 
 ---
 
 ## Platform Choice
 
-We use both CPU and GPU platforms to explore different parallelization strategies.
-
-GPUs are well-suited for high-throughput data-parallel workloads such as particle updates and grid computations. CPUs, on the other hand, provide more flexibility for handling irregular memory access patterns and complex control flow.
-
-Because FLIP combines both structured and unstructured computation, it provides an excellent opportunity to evaluate the strengths and weaknesses of each platform.
+We will use both CPU (OpenMP) and GPU (CUDA) platforms to explore different parallelization strategies. GPU’s are generally suited for large data-parallel workloads like the ones we have in our particle updates and grid computations, while the CPU may be better because of irregular memory access patterns and complex computations. Since FLIP combines these two aspects, it is not immediately clear which implementation will perform better. We will test on different hardware ranging from a pc with a RTX 3070 to laptops with integrated graphics.
 
 ---
 
@@ -98,20 +78,13 @@ During the first week, we finalize the system design, set up the codebase, and i
 
 In the second week, we implement a complete serial version of the FLIP pipeline, including particle-to-grid transfer, grid updates, and a basic pressure solver.
 
-By the third week, we parallelize the CPU implementation using OpenMP and profile performance to identify bottlenecks. This stage corresponds to the milestone report.
+By the third week, we begin implementing CUDA kernels for the GPU version, focusing on particle-grid transfers and grid updates. This stage corresponds to the milestone report.
 
-In the fourth week, we begin implementing CUDA kernels for the GPU version, focusing on particle-grid transfers and grid updates.
+In the fourth week, we parallelize the CPU implementation using OpenMP and profile performance to identify bottlenecks. 
 
 During the fifth week, we optimize both implementations by improving memory access patterns and reducing synchronization overhead. We also perform detailed performance comparisons.
 
 In the final week, we complete benchmarking, refine visualization, and prepare the final report and poster.
 
----
-
-## Expected Results
-
-We expect to observe significant speedups for data-parallel portions of the simulation on the GPU, particularly during particle updates and grid operations.
-
-However, we anticipate that the pressure solver and synchronization-heavy stages will limit scalability. The results of this project will provide insight into how hybrid workloads behave across different parallel architectures.
 
 ---
