@@ -59,7 +59,7 @@ For our implementation, we plan on referencing the SIGGRAPH 2007 Fluid Simulatio
   - A combined implementation
   - Evaluation comparing CPU and GPU workloads
   - Analysis of bottlenecks
-  - 
+ 
 **Hope to achieve:**
   - Real time simulation for moderately sized grids
   - Optimized pressure solver
