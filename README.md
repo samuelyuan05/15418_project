@@ -3,13 +3,16 @@
 ## Authors
 Samuel Yuan, Daniel Stankiewicz
 
----
+## URL
+https://samuelyuan05.github.io/15418_project/
 
+---
 ## Summary
 
 We plan to implement a 3D FLIP fluid solver, and explore optimizations using CUDA and OpenMP to improve runtime performance. Throughout the process, we will analyze performance tradeoffs between running on different hardware (CPU/GPU) because of bottlenecks such as communication amongst other things.
 
 ---
+
 
 ## Background
 FLIP (Fluid-Implicit Particle) simulation is a hybrid simulation technique that combines both Lagrangian particles and a grid. While particles carry fluid information like mass or velocity, a background grid is used to more efficiently compute forces and enforce incompressibility. Compared to something like SPH which is reliant on particle interactions, FLIP avoids this scaled complexity by leveraging structured grid computations, while also reducing numerical dissipation by preserving particle velocities. For a FLIP simulation, during each timestep, the algorithm breaks down into a few highly parallel parts:
