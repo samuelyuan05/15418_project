@@ -92,123 +92,70 @@ In the final week, we complete benchmarking, refine visualization, and prepare t
 
 ---
 
-
-# 3D FLIP Fluid Simulation — Milestone Report (April 14, 2025)
+# Milestone Report (April 14, 2025)
 
 ## Work Completed
 
-We have successfully implemented a fully functional **3D FLIP fluid simulation** with an OpenGL-based real-time renderer.
+We have successfully implemented a fully functional 3D FLIP fluid simulation with an OpenGL-based real-time renderer. The core simulation pipeline is complete, with particle-to-grid transfer (P2G), gravity application, pressure solving, grid-to-particle transfer (G2P), and particle advection all producing fluid behavior. The simulation uses a MAC (Marker-and-Cell) staggered grid with trilinear interpolation for particle-grid transfers, a Jacobi solver for the pressure Poisson equation, and RK2 integration with adaptive sub-stepping for particle advection.
 
-### Core Simulation Pipeline
-- Particle-to-Grid transfer (P2G)
-- Gravity application
-- Pressure solving (Jacobi solver for Poisson equation)
-- Grid-to-Particle transfer (G2P)
-- Particle advection
-
-### Key Features
-- **MAC (Marker-and-Cell) staggered grid**
-- **Trilinear interpolation** for particle-grid transfers
-- **RK2 integration with adaptive sub-stepping** for particle advection
-
-### Performance & Rendering
-- CPU backend parallelized with **OpenMP** (functional, not yet optimized)
-- GPU backend (**CUDA**) implemented (currently under validation)
-- Real-time rendering using:
-  - **OpenGL + GLFW**
-  - Particles rendered as point sprites
-  - Velocity-based coloring (blue = slow, red = fast)
-  - Blender-style camera controls (orbit, pan, zoom)
+The CPU backend is parallelized with OpenMP and working correctly, although we haven’t optimized nor made benchmarks for it. The rendering system uses OpenGL with GLFW, displaying particles as colored point sprites with velocity-mapped colors (blue for slow, red for fast). Camera controls support Blender-style orbit, pan, and zoom. The GPU (CUDA) backend has all kernels implemented, and we are in the process of testing it against the CPU reference output.
 
 ---
 
 ## Goals and Deliverables
 
-### Status vs Original Plan
+Status relative to original plan-to-achieve goals:
 
 | Goal | Status |
 |------|--------|
-| Working 3D FLIP-based fluid simulator | ✅ Complete |
-| Parallel CPU implementation (OpenMP) | ✅ Complete |
-| GPU implementation (CUDA) | 🟡 Kernels implemented, validation in progress |
-| CPU vs GPU evaluation | ❌ Pending |
-| Bottleneck analysis | ❌ Pending |
+| Working 3D FLIP-based fluid simulator | Complete |
+| Parallel CPU implementation using OpenMP | Complete |
+| GPU implementation using CUDA | All kernels implemented, validation in progress |
+| Evaluation comparing CPU and GPU workloads | Pending (no timing instrumentation yet) |
+| Analysis of bottlenecks | Pending |
 
-### Updated Goals (Poster Session)
+We believe all plan-to-achieve goals are still reachable by the poster session. The real-time demo (a hope-to-achieve goal) is also achievable given the rendering pipeline is already in place. The optimized pressure solver and memory locality improvements remain stretch goals we will attempt after completing the GPU backend.
 
-- Validate GPU (CUDA) solver against CPU baseline
-- Add timing instrumentation and benchmarking
-- Generate **speedup graphs**:
-  - Per stage: P2G, pressure solve, G2P, advection
-  - End-to-end simulation
-- Live real-time fluid simulation demo
+Updated goals for the poster session:
 
-#### Stretch Goals
-- Optimized pressure solver (e.g., Red-Black Gauss-Seidel)
-- Memory layout improvements for GPU coalescing
+- Validate GPU (CUDA) solver output against CPU reference baseline  
+- Timing instrumentation and benchmarking across CPU and GPU backends  
+- Speedup graphs comparing CPU and GPU per simulation stage (P2G, pressure solve, G2P, advection) and end-to-end  
+- Live real-time fluid simulation demo  
+- (Stretch) Optimized pressure solver (e.g., Red-Black Gauss-Seidel)  
+- (Stretch) Memory layout improvements for better GPU coalescing  
 
 ---
 
 ## Poster Session Plan
 
-### Live Demo
-- Real-time interactive 3D fluid simulation
-- Full camera control (orbit, pan, zoom)
-
-### Performance Visualization
-- CPU (OpenMP) vs GPU (CUDA) comparisons
-- Metrics across:
-  - Grid resolutions
-  - Particle counts
-- Breakdown by simulation stage
-- Identification of performance bottlenecks
+We plan to show both a live interactive demo and performance graphs. The demo will display the real-time 3D fluid simulation with the Blender-style camera so viewers can explore the fluid from different angles. The performance graphs will compare CPU (OpenMP) and GPU (CUDA) execution times across different grid resolutions and particle counts, broken down by simulation stage, and will highlight where GPU parallelism provides the most benefit and where bottlenecks remain.
 
 ---
 
 ## Preliminary Results
 
-- No quantitative benchmarks yet (timing not implemented)
-- Qualitative performance:
-  - Real-time simulation at **20×20×20 grid**
-  - ~27,000 particles
-
-### Immediate Priority
-- Add per-stage timers to establish CPU baseline
+We do not yet have quantitative benchmark numbers, as timing instrumentation has not been added to the codebase. Qualitatively, the CPU simulation runs in real time at a 20×20×20 grid resolution with approximately 27,000 particles, which is encouraging for our real-time demo goal. Adding per-stage timers is a top priority this week to establish a CPU baseline before GPU comparison.
 
 ---
 
 ## Concerns and Remaining Issues
 
-### Major Challenges
+The largest challenges we have encountered so far:
 
-#### 1. Pressure Solver Correctness
-- Handling air/water/solid boundaries
-- Correct divergence computation on MAC grid
-- Stable velocity projection
-- Small boundary errors caused visible instability
+Pressure solver correctness: Getting the Jacobi solver for the pressure Poisson equation correct was the most significant implementation challenge. Proper handling of air/water/solid cell boundaries, correct divergence computation on the staggered MAC grid, and stable velocity projection required debugging. Small errors in boundary handling caused visible instability in the fluid behavior.
 
-#### 2. FLIP Algorithm Correctness
-- Proper PIC/FLIP blending
-- Consistent trilinear interpolation
-- Correct staggered grid indexing
+FLIP algorithm correctness: Correctly blending PIC and FLIP velocity updates and getting trilinear interpolation consistent with the staggered MAC grid face offsets required careful attention to grid indexing conventions.
 
----
+Remaining concerns going forward:
 
-### Remaining Concerns
+GPU P2G with atomics: Particle-to-grid transfer uses atomicAdd to prevent data races. We need to benchmark whether this limits GPU speedup enough to warrant a sort-based approach instead.
 
-- **GPU P2G with atomics**
-  - Uses `atomicAdd`
-  - May limit scalability → consider sort-based alternative
+GPU pressure solver scaling: The Jacobi solver's iterative nature is a known bottleneck for GPU implementations.
 
-- **GPU pressure solver**
-  - Jacobi iterations may become bottleneck
+Host to device transfer overhead: The current step() copies all particle positions and velocities to the GPU at the start of each frame and back at the end. At large particle counts this transfer cost could dominate.
 
-- **Host ↔ Device transfer overhead**
-  - Full particle copy each frame
-  - Could dominate runtime at scale
-
-- **No timing infrastructure**
-  - Critical for benchmarking and analysis
+No timing infrastructure yet: This needs to be added immediately to produce meaningful benchmark results for the poster.
 
 ---
 
@@ -216,22 +163,10 @@ We have successfully implemented a fully functional **3D FLIP fluid simulation**
 
 | Period | Tasks | Owner |
 |--------|------|--------|
-| Apr 14–17 (Mon–Thu) | Validate GPU vs CPU output; add CUDA event timing | Daniel |
-| Apr 14–17 (Mon–Thu) | Add `std::chrono` CPU timing; analyze transfer overhead | Samuel |
-| Apr 18–21 (Fri–Mon) | Run baseline benchmarks (20³, 30³, 40³) | Both |
-| Apr 18–21 (Fri–Mon) | Profile GPU; investigate memory bottlenecks; try SoA layout | Samuel |
-| Apr 22–25 (Tue–Fri) | (Stretch) Optimize pressure solver (RBGS / tiled Jacobi) | Daniel |
-| Apr 22–25 (Tue–Fri) | Generate final graphs; finalize demo | Samuel |
-| Apr 26–29 (Sat–Tue) | Final report, poster prep, demo rehearsal | Both |
-
----
-
-## Summary
-
-We have completed a fully functional 3D FLIP simulation pipeline with real-time rendering. The primary remaining work involves:
-
-- **GPU validation**
-- **Performance benchmarking**
-- **Bottleneck analysis**
-
-We are on track to deliver a compelling live demo and detailed performance evaluation at the poster session.
+| Apr 14–17 (Mon–Thu) | Validate GPU solver output against CPU on matching test cases; add CUDA event timing around each kernel stage | Daniel |
+| Apr 14–17 (Mon–Thu) | Add std::chrono timing to CPU path; investigate host↔device transfer overhead; assess whether persistent GPU buffers are needed | Samuel |
+| Apr 18–21 (Fri–Mon) | Run baseline benchmarks: CPU vs GPU per stage at 20³, 30³, 40³ grid sizes; generate initial speedup data | Both |
+| Apr 18–21 (Fri–Mon) | Profile GPU kernels; identify memory bottlenecks; attempt SoA particle layout if coalescing is poor | Samuel |
+| Apr 22–25 (Tue–Fri) | (Stretch) Implement Red-Black Gauss-Seidel or tiled Jacobi for improved GPU pressure convergence; benchmark improvement | Daniel |
+| Apr 22–25 (Tue–Fri) | Produce final graphs (speedup by stage, overall, scaling); finalize demo scene and rendering quality for poster | Samuel |
+| Apr 26–29 (Sat–Tue) | Write final report; prepare poster; rehearse demo; final end-to-end testing on target hardware | Both |
